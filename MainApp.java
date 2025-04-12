@@ -1,159 +1,270 @@
-import javax.swing.*;
-import java.awt.event.*;
-import java.sql.*;
+    import java.awt.*;
+    import java.awt.event.*;
+    import java.sql.*;
 
-public class MainApp {
-    static Connection con;
-    static Statement stmt;
+    class SQLDB {
+        public static Connection conn = null;
+        public static Statement stmt = null;
 
-    public static void main(String[] args) {
-        connectDB("javaapp.db");
-        new Signup(); // Start with signup window
-    }
+        public static void connect(String dbpath) {
+            try {
+                Class.forName("org.sqlite.JDBC");
+                conn = DriverManager.getConnection("jdbc:sqlite:" + dbpath);
+                stmt = conn.createStatement();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
 
-    static void connectDB(String dbName) {
-        try {
-            Class.forName("org.sqlite.JDBC");
-            con = DriverManager.getConnection("jdbc:sqlite:" + dbName);
-            stmt = con.createStatement();
-            stmt.executeUpdate("CREATE TABLE IF NOT EXISTS users (uname TEXT PRIMARY KEY, pwd TEXT NOT NULL)");
-            System.out.println("Connected to database.");
-        } catch (Exception e) {
-            e.printStackTrace();
+        public static boolean isUnique(String username, String email) {
+            ResultSet rs = null;
+            try {
+                String query = "SELECT * FROM users WHERE username='" + username + "' OR email='" + email + "';";
+                rs = stmt.executeQuery(query);
+                return !rs.next();
+            } catch (SQLException e) {
+                e.printStackTrace();
+                return false;
+            } finally {
+                try { if (rs != null) rs.close(); } catch (Exception e) {}
+            }
+        }
+
+        public static boolean insertUser(String username, String email, String password) {
+            try {
+                String query = "INSERT INTO users (username, email, password, score) VALUES ('" + username + "', '" + email + "', '" + password + "', 0);";
+                int rowsAffected = stmt.executeUpdate(query);
+                return rowsAffected > 0;
+            } catch (SQLException e) {
+                e.printStackTrace();
+                return false;
+            }
+        }
+
+        public static boolean loginValid(String email, String password) {
+            try {
+                String query = "SELECT * FROM users WHERE email='" + email + "' AND password='" + password + "';";
+                ResultSet rs = stmt.executeQuery(query);
+                return rs.next();
+            } catch (SQLException e) {
+                e.printStackTrace();
+                return false;
+            }
+        }
+
+        public static void close() {
+            try {
+                if (stmt != null) stmt.close();
+                if (conn != null) conn.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
         }
     }
 
-    static boolean execute(String query) {
-        try {
-            ResultSet rs = stmt.executeQuery(query);
-            return rs.next();
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
+    class SignUp extends Frame implements ActionListener {
+        Label l1 = new Label("Username:");
+        Label l2 = new Label("Email:");
+        Label l3 = new Label("Password:");
+        TextField t1 = new TextField();
+        TextField t2 = new TextField();
+        TextField t3 = new TextField();
+        Button signupBtn = new Button("Signup");
+        Button loginBtn = new Button("Login");
+
+        SignUp() {
+            Font labelFont = new Font("Arial", Font.PLAIN, 14);
+            l1.setFont(labelFont);
+            l2.setFont(labelFont);
+            l3.setFont(labelFont);
+            
+            setTitle("Signup");
+            setSize(350, 200);
+            setLayout(new GridLayout(4, 2, 10, 10));
+            setLocationRelativeTo(null);
+
+            add(l1); 
+            add(t1);
+            add(l2); 
+            add(t2);
+            add(l3); 
+            add(t3);
+            add(signupBtn);
+            add(loginBtn);
+
+            signupBtn.setPreferredSize(new Dimension(100, 35));
+            signupBtn.setBackground(new Color(0, 120, 215)); // Blue color
+            signupBtn.setForeground(Color.WHITE);
+            signupBtn.setFont(new Font("Arial", Font.BOLD, 14));
+
+            loginBtn.setPreferredSize(new Dimension(100, 35));
+            loginBtn.setBackground(new Color(0, 120, 215)); // Blue color
+            loginBtn.setForeground(Color.WHITE);
+            loginBtn.setFont(new Font("Arial", Font.BOLD, 14));
+
+            signupBtn.addActionListener(this);
+            loginBtn.addActionListener(this);
+
+            addWindowListener(new WindowAdapter() {
+                public void windowClosing(WindowEvent we) {
+                    SQLDB.close();
+                    dispose();
+                    System.exit(0);
+                }
+            });
+
+            setVisible(true);
         }
-    }
 
-    static void insert(String query) {
-        try {
-            stmt.executeUpdate(query);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+        public void actionPerformed(ActionEvent ae) {
+            if (ae.getSource() == signupBtn) {
+                SQLDB.connect("D:\\Java\\Java-Project\\javaapp.db");
+                String username = t1.getText().trim();
+                String email = t2.getText().trim();
+                String password = t3.getText().trim();
 
-    static class Signup {
-        JFrame f;
-        JTextField t1;
-        JPasswordField p1;
+                if (username.isEmpty() || email.isEmpty() || password.isEmpty()) {
+                    showMessage("Please fill all fields",false);
+                    return;
+                }
 
-        public Signup() {
-            f = new JFrame("Signup");
-            f.setSize(300, 200);
-            f.setLayout(null);
-
-            JLabel l1 = new JLabel("Username:");
-            l1.setBounds(20, 20, 80, 25);
-            f.add(l1);
-
-            t1 = new JTextField();
-            t1.setBounds(110, 20, 150, 25);
-            f.add(t1);
-
-            JLabel l2 = new JLabel("Password:");
-            l2.setBounds(20, 60, 80, 25);
-            f.add(l2);
-
-            p1 = new JPasswordField();
-            p1.setBounds(110, 60, 150, 25);
-            f.add(p1);
-
-            JButton b1 = new JButton("Signup");
-            b1.setBounds(100, 100, 100, 30);
-            f.add(b1);
-
-            b1.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent e) {
-                    String user = t1.getText();
-                    String pass = new String(p1.getPassword());
-
-                    if (user.isEmpty() || pass.isEmpty()) {
-                        JOptionPane.showMessageDialog(f, "Please fill all fields.");
-                        return;
-                    }
-
-                    String checkQuery = "SELECT * FROM users WHERE uname = '" + user + "'";
-                    if (execute(checkQuery)) {
-                        JOptionPane.showMessageDialog(f, "User already exists!");
+                if (SQLDB.isUnique(username, email)) {
+                    boolean inserted = SQLDB.insertUser(username, email, password);
+                    if (inserted) {
+                        showMessage("Signup successful",true);
+                        t1.setText(""); t2.setText(""); t3.setText("");
                     } else {
-                        String insertQuery = "INSERT INTO users(uname, pwd) VALUES('" + user + "', '" + pass + "')";
-                        insert(insertQuery);
-                        JOptionPane.showMessageDialog(f, "Signup Successful!");
-                        f.dispose();
-                        new Login();
+                        showMessage("Failed to create account",false);
+                    }
+                } else {
+                    showMessage("Username or Email already exists",false);
+                }
+            } else if (ae.getSource() == loginBtn) {
+                SQLDB.close();
+                this.dispose();
+                new Login();
+            }
+        }
+
+        private void showMessage(String msg, boolean closeFrameOnOk) {
+            Dialog d = new Dialog(this, "Message", true);
+            d.setLayout(new FlowLayout());
+            d.add(new Label(msg));
+
+            d.addWindowListener(new WindowAdapter() {
+                public void windowClosing(WindowEvent e) {
+                    d.dispose();
+                    if (closeFrameOnOk) {
+                        dispose(); // Close login window
                     }
                 }
             });
 
-            f.setVisible(true);
+            d.setSize(250, 100);
+            d.setLocationRelativeTo(this);
+            d.setVisible(true);
         }
     }
 
-    static class Login {
-        JFrame f;
-        JTextField t1;
-        JPasswordField p1;
+    class Login extends Frame implements ActionListener {
+        Label l1 = new Label("Email:");
+        Label l2 = new Label("Password:");
+        TextField t1 = new TextField();
+        TextField t2 = new TextField();
+        Button loginBtn = new Button("Login");
+        Button signupBtn = new Button("Signup");
 
-        public Login() {
-            f = new JFrame("Login");
-            f.setSize(300, 200);
-            f.setLayout(null);
+        Login() {
+            Font labelFont = new Font("Arial", Font.PLAIN, 14);
+            l1.setFont(labelFont);
+            l2.setFont(labelFont);
 
-            JLabel l1 = new JLabel("Username:");
-            l1.setBounds(20, 20, 80, 25);
-            f.add(l1);
+            t1.setPreferredSize(new Dimension(100, 30));
+            t2.setPreferredSize(new Dimension(100, 30));
 
-            t1 = new JTextField();
-            t1.setBounds(110, 20, 150, 25);
-            f.add(t1);
+            setTitle("Login");
+            setSize(350, 200);
+            setLayout(new GridLayout(3, 2, 10, 10));
+            setLocationRelativeTo(null);
 
-            JLabel l2 = new JLabel("Password:");
-            l2.setBounds(20, 60, 80, 25);
-            f.add(l2);
+            add(l1);
+            add(t1);
+            add(l2);
+            add(t2);
+            add(loginBtn);
+            add(signupBtn);
 
-            p1 = new JPasswordField();
-            p1.setBounds(110, 60, 150, 25);
-            f.add(p1);
+            signupBtn.setPreferredSize(new Dimension(100, 35));
+            signupBtn.setBackground(new Color(0, 120, 215)); // Blue color
+            signupBtn.setForeground(Color.WHITE);
+            signupBtn.setFont(new Font("Arial", Font.BOLD, 14));
 
-            JButton b1 = new JButton("Login");
-            b1.setBounds(100, 100, 100, 30);
-            f.add(b1);
+            loginBtn.setPreferredSize(new Dimension(100, 35));
+            loginBtn.setBackground(new Color(0, 120, 215)); // Blue color
+            loginBtn.setForeground(Color.WHITE);
+            loginBtn.setFont(new Font("Arial", Font.BOLD, 14));
 
-            b1.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent e) {
-                    String user = t1.getText();
-                    String pass = new String(p1.getPassword());
+            loginBtn.addActionListener(this);
+            signupBtn.addActionListener(this);
 
-                    if (user.isEmpty() || pass.isEmpty()) {
-                        JOptionPane.showMessageDialog(f, "Please fill all fields.");
-                        return;
-                    }
+            addWindowListener(new WindowAdapter() {
+                public void windowClosing(WindowEvent we) {
+                    SQLDB.close();
+                    dispose();
+                    System.exit(0);
+                }
+            });
 
-                    String loginQuery = "SELECT * FROM users WHERE uname = '" + user + "' AND pwd = '" + pass + "'";
-                    if (execute(loginQuery)) {
-                        JOptionPane.showMessageDialog(f, "Login Successful!");
-                        f.dispose();
-                        // You can launch your game here
-                        JFrame g = new JFrame("Welcome");
-                        g.setSize(200, 100);
-                        g.add(new JLabel("Game/Portal Loaded"), SwingConstants.CENTER);
-                        g.setVisible(true);
-                    } else {
-                        JOptionPane.showMessageDialog(f, "Invalid username or password.");
+            setVisible(true);
+        }
+
+        public void actionPerformed(ActionEvent ae) {
+            SQLDB.connect("D:\\Java\\Java-Project\\javaapp.db");
+
+            if (ae.getSource() == loginBtn) {
+                String email = t1.getText().trim();
+                String password = t2.getText().trim();
+                if (email.isEmpty() || password.isEmpty()) {
+                    showMessage("Please enter credentials", false);
+                    return;
+                }
+
+                boolean valid = SQLDB.loginValid(email, password);
+                if (valid)
+                    showMessage("Login successful", true);
+                else
+                    showMessage("Invalid Email or Password", false);
+
+            } else if (ae.getSource() == signupBtn) {
+                SQLDB.close();
+                this.dispose();
+                new SignUp();
+            }
+        }
+
+        // 🔄 Modified to handle success case
+        private void showMessage(String msg, boolean closeFrameOnOk) {
+            Dialog d = new Dialog(this, "Message", true);
+            d.setLayout(new FlowLayout());
+            d.add(new Label(msg));
+
+            d.addWindowListener(new WindowAdapter() {
+                public void windowClosing(WindowEvent e) {
+                    d.dispose();
+                    if (closeFrameOnOk) {
+                        dispose(); // Close login window
                     }
                 }
             });
 
-            f.setVisible(true);
+            d.setSize(250, 100);
+            d.setLocationRelativeTo(this);
+            d.setVisible(true);
         }
     }
-}
+
+    public class MainApp {
+        public static void main(String[] args) {
+            new SignUp();
+        }
+    }
