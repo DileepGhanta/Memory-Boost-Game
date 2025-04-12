@@ -2,6 +2,178 @@
     import java.awt.event.*;
     import java.sql.*;
 
+    import javax.swing.*;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
+
+class MemoryCardGame extends JFrame {
+    private JPanel mainPanel;
+    private String selectedTheme;
+    private ArrayList<String> imagePaths;
+    private JButton[] cardButtons;
+    private ImageIcon hiddenIcon;
+    private int firstIndex = -1, secondIndex = -1;
+    private Timer timer;
+    static int numMoves = 0;
+    private int matchedPairs = 0;
+    private String userEmail;
+
+    
+    public MemoryCardGame(String userEmail) {
+        this.userEmail = userEmail;
+        setTitle("Memory Card Game");
+        setSize(600, 600);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+
+        // Load hidden card image
+        hiddenIcon = loadImage("Images/hidden.png", 600, 600);
+
+        selectTheme();
+    }
+
+
+    private void selectTheme() {
+        String[] themes = {"Cricket", "IPL", "Anime", "Memes"};
+        selectedTheme = (String) JOptionPane.showInputDialog(
+            this, "Select a Theme:", "Theme Selection", 
+            JOptionPane.QUESTION_MESSAGE, null, themes, themes[0]
+        );
+
+        if (selectedTheme != null) {
+            loadImages(selectedTheme);
+            initializeGame();
+        } else {
+            System.exit(0);
+        }
+    }
+
+    private void loadImages(String theme) {
+        imagePaths = new ArrayList<>();
+        String folderPath = "Images/" + theme;
+
+        File folder = new File(folderPath);
+        if (folder.exists() && folder.isDirectory()) {
+            File[] files = folder.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    if (file.isFile() && (file.getName().endsWith(".png") || file.getName().endsWith(".jpg"))) {
+                        // System.out.println("Loaded Image: " + file.getAbsolutePath());
+                        imagePaths.add(file.getAbsolutePath());
+                    }
+                }
+            }
+        }
+
+        if (imagePaths.size() < 8) {
+            JOptionPane.showMessageDialog(this, "Not enough images found in " + theme);
+            System.exit(0);
+        }
+
+        // Duplicate the images for the memory game
+        imagePaths = new ArrayList<>(imagePaths.subList(0, 8));
+        imagePaths.addAll(new ArrayList<>(imagePaths));
+        Collections.shuffle(imagePaths);
+    }
+
+    private void initializeGame() {
+        mainPanel = new JPanel();
+        mainPanel.setLayout(new GridLayout(4, 4));
+        int cardWidth = 100;
+        int cardHeight = 100;
+        cardButtons = new JButton[imagePaths.size()];
+        
+        for (int i = 0; i < imagePaths.size(); i++) {
+            cardButtons[i] = new JButton(hiddenIcon);
+            cardButtons[i].setActionCommand(String.valueOf(i));
+            cardButtons[i].setPreferredSize(new Dimension(cardWidth, cardHeight));
+            cardButtons[i].addActionListener(new CardClickListener());
+            mainPanel.add(cardButtons[i]);
+        }
+
+        add(mainPanel);
+        pack();
+        setVisible(true);
+    }
+
+    private class CardClickListener implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            int index = Integer.parseInt(e.getActionCommand());
+    
+            // Ignore clicks on already matched cards
+            if (cardButtons[index].getIcon() != hiddenIcon) {
+                return;
+            }
+    
+            // First card selection
+            if (firstIndex == -1) {
+                firstIndex = index;
+                cardButtons[firstIndex].setIcon(loadImage(imagePaths.get(firstIndex), 100, 100));
+            }
+            // Second card selection
+            else if (secondIndex == -1) {
+                secondIndex = index;
+                cardButtons[secondIndex].setIcon(loadImage(imagePaths.get(secondIndex), 100, 100));
+                numMoves+=2;
+                // System.out.println(numMoves);
+    
+                // Delay before checking for match
+                timer = new Timer(1000, event -> checkMatch());
+                timer.setRepeats(false);
+                timer.start();
+            }
+        }
+    }
+    
+
+    private void checkMatch() {
+        if (imagePaths.get(firstIndex).equals(imagePaths.get(secondIndex))) {
+            // Match: Disable cards
+            cardButtons[firstIndex].setEnabled(false);
+            cardButtons[secondIndex].setEnabled(false);
+            matchedPairs++;
+    
+            if (matchedPairs == (imagePaths.size() / 2)) {
+                showScore();
+            }
+        } else {
+            // No match: Flip cards back
+            cardButtons[firstIndex].setIcon(hiddenIcon);
+            cardButtons[secondIndex].setIcon(hiddenIcon);
+        }
+    
+        // Reset selected indices
+        firstIndex = -1;
+        secondIndex = -1;
+    }
+    
+
+    private void showScore() {
+        int totalCards = imagePaths.size();
+        double score = (totalCards*1.0 /numMoves) * 100000;
+        score = Math.round(score * 10000) / 10000.0;
+        System.out.println(numMoves);
+        JOptionPane.showMessageDialog(this, "Game Over!\n" + "Your Score: " + String.format("%.4f", score), "Game Completed", JOptionPane.INFORMATION_MESSAGE);
+        SQLDB.updateScore(userEmail, score); 
+    }
+
+    private ImageIcon loadImage(String path, int width, int height) {
+        File file = new File(path);
+        if (!file.exists()) {
+            System.err.println("Image not found: " + path);
+            return null;
+        }
+
+        ImageIcon icon = new ImageIcon(path);
+        Image img = icon.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
+        return new ImageIcon(img);
+    }
+
+    // public static void main(String[] args) {
+    //     SwingUtilities.invokeLater(() -> new MemoryCardGame());
+    // }
+}
     class SQLDB {
         public static Connection conn = null;
         public static Statement stmt = null;
@@ -52,6 +224,31 @@
             }
         }
 
+        public static boolean updateScore(String email, double score) {
+            if (conn == null) return false;
+            try {
+                conn.close();
+                Class.forName("org.sqlite.JDBC");
+                conn = DriverManager.getConnection("jdbc:sqlite:" + "D:\\Java\\Java-Project\\javaapp.db");
+                stmt = conn.createStatement();
+                String query = "UPDATE users SET score = ? WHERE email = ?";
+                PreparedStatement ps = conn.prepareStatement(query);
+                ps.setDouble(1, score);
+                ps.setString(2, email);
+        
+                int rowsUpdated = ps.executeUpdate();
+                return rowsUpdated > 0;
+            } catch (SQLException e) {
+                System.out.println("Failed to update score: " + e.getMessage());
+                return false;
+            }
+            catch(Exception e){
+                System.out.println("Exception " + e.getMessage());
+                return false;
+
+            }
+        }
+        
         public static void close() {
             try {
                 if (stmt != null) stmt.close();
@@ -71,7 +268,7 @@
         TextField t3 = new TextField();
         Button signupBtn = new Button("Signup");
         Button loginBtn = new Button("Login");
-
+    
         SignUp() {
             Font labelFont = new Font("Arial", Font.PLAIN, 14);
             l1.setFont(labelFont);
@@ -82,62 +279,56 @@
             setSize(350, 200);
             setLayout(new GridLayout(4, 2, 10, 10));
             setLocationRelativeTo(null);
-
-            add(l1); 
-            add(t1);
-            add(l2); 
-            add(t2);
-            add(l3); 
-            add(t3);
-            add(signupBtn);
-            add(loginBtn);
-
+    
+            add(l1); add(t1);
+            add(l2); add(t2);
+            add(l3); add(t3);
+            add(signupBtn); add(loginBtn);
+    
             signupBtn.setPreferredSize(new Dimension(100, 35));
-            signupBtn.setBackground(new Color(0, 120, 215)); // Blue color
+            signupBtn.setBackground(new Color(0, 120, 215));
             signupBtn.setForeground(Color.WHITE);
             signupBtn.setFont(new Font("Arial", Font.BOLD, 14));
-
+    
             loginBtn.setPreferredSize(new Dimension(100, 35));
-            loginBtn.setBackground(new Color(0, 120, 215)); // Blue color
+            loginBtn.setBackground(new Color(0, 120, 215));
             loginBtn.setForeground(Color.WHITE);
             loginBtn.setFont(new Font("Arial", Font.BOLD, 14));
-
+    
             signupBtn.addActionListener(this);
             loginBtn.addActionListener(this);
-
+    
             addWindowListener(new WindowAdapter() {
                 public void windowClosing(WindowEvent we) {
                     SQLDB.close();
                     dispose();
-                    System.exit(0);
                 }
             });
-
+    
             setVisible(true);
         }
-
+    
         public void actionPerformed(ActionEvent ae) {
             if (ae.getSource() == signupBtn) {
                 SQLDB.connect("D:\\Java\\Java-Project\\javaapp.db");
                 String username = t1.getText().trim();
                 String email = t2.getText().trim();
                 String password = t3.getText().trim();
-
+    
                 if (username.isEmpty() || email.isEmpty() || password.isEmpty()) {
-                    showMessage("Please fill all fields",false);
+                    showErrorDialog("Please fill all fields");
                     return;
                 }
-
+    
                 if (SQLDB.isUnique(username, email)) {
                     boolean inserted = SQLDB.insertUser(username, email, password);
                     if (inserted) {
-                        showMessage("Signup successful",true);
-                        t1.setText(""); t2.setText(""); t3.setText("");
+                        showSuccessDialog(); // Show message and wait to launch game
                     } else {
-                        showMessage("Failed to create account",false);
+                        showErrorDialog("Failed to create account");
                     }
                 } else {
-                    showMessage("Username or Email already exists",false);
+                    showErrorDialog("Username or Email already exists");
                 }
             } else if (ae.getSource() == loginBtn) {
                 SQLDB.close();
@@ -145,27 +336,45 @@
                 new Login();
             }
         }
-
-        private void showMessage(String msg, boolean closeFrameOnOk) {
-            Dialog d = new Dialog(this, "Message", true);
+    
+        // Dialog without OK button for success
+        private void showSuccessDialog() {
+            Dialog d = new Dialog(this, "Success", true);
             d.setLayout(new FlowLayout());
-            d.add(new Label(msg));
-
+            d.setSize(300, 100);
+            d.setLocationRelativeTo(this);
+            d.add(new Label("Signup successful! Close this window to continue."));
+    
             d.addWindowListener(new WindowAdapter() {
                 public void windowClosing(WindowEvent e) {
                     d.dispose();
-                    if (closeFrameOnOk) {
-                        dispose(); // Close login window
-                    }
+                    dispose();          // Close signup window
+                    SQLDB.close();
+                    new MemoryCardGame(t2.getText().trim()); // Launch game
+                }
+            });
+    
+            d.setVisible(true);
+        }
+    
+        // For error messages (with OK button)
+        private void showErrorDialog(String msg) {
+            Dialog d = new Dialog(this, "Error", true);
+            d.setLayout(new FlowLayout());
+            d.setSize(250, 100);
+            d.setLocationRelativeTo(this);
+    
+            d.add(new Label(msg));
+            d.addWindowListener(new WindowAdapter() {
+                public void windowClosing(WindowEvent e) {
+                    d.dispose();
                 }
             });
 
-            d.setSize(250, 100);
-            d.setLocationRelativeTo(this);
             d.setVisible(true);
         }
     }
-
+    
     class Login extends Frame implements ActionListener {
         Label l1 = new Label("Email:");
         Label l2 = new Label("Password:");
@@ -173,98 +382,101 @@
         TextField t2 = new TextField();
         Button loginBtn = new Button("Login");
         Button signupBtn = new Button("Signup");
-
+    
         Login() {
-            Font labelFont = new Font("Arial", Font.PLAIN, 14);
-            l1.setFont(labelFont);
-            l2.setFont(labelFont);
-
-            t1.setPreferredSize(new Dimension(100, 30));
-            t2.setPreferredSize(new Dimension(100, 30));
-
             setTitle("Login");
-            setSize(350, 200);
+            setSize(350, 170);
             setLayout(new GridLayout(3, 2, 10, 10));
             setLocationRelativeTo(null);
-
-            add(l1);
-            add(t1);
-            add(l2);
-            add(t2);
-            add(loginBtn);
-            add(signupBtn);
-
-            signupBtn.setPreferredSize(new Dimension(100, 35));
-            signupBtn.setBackground(new Color(0, 120, 215)); // Blue color
-            signupBtn.setForeground(Color.WHITE);
-            signupBtn.setFont(new Font("Arial", Font.BOLD, 14));
-
-            loginBtn.setPreferredSize(new Dimension(100, 35));
-            loginBtn.setBackground(new Color(0, 120, 215)); // Blue color
+    
+            add(l1); add(t1);
+            add(l2); add(t2);
+            add(loginBtn); add(signupBtn);
+    
+            loginBtn.setBackground(new Color(0, 120, 215));
             loginBtn.setForeground(Color.WHITE);
             loginBtn.setFont(new Font("Arial", Font.BOLD, 14));
-
+    
+            signupBtn.setBackground(new Color(0, 120, 215));
+            signupBtn.setForeground(Color.WHITE);
+            signupBtn.setFont(new Font("Arial", Font.BOLD, 14));
+    
             loginBtn.addActionListener(this);
             signupBtn.addActionListener(this);
-
+    
             addWindowListener(new WindowAdapter() {
                 public void windowClosing(WindowEvent we) {
                     SQLDB.close();
                     dispose();
-                    System.exit(0);
                 }
             });
-
+    
             setVisible(true);
         }
-
+    
         public void actionPerformed(ActionEvent ae) {
-            SQLDB.connect("D:\\Java\\Java-Project\\javaapp.db");
-
             if (ae.getSource() == loginBtn) {
+                SQLDB.connect("D:\\Java\\Java-Project\\javaapp.db");
                 String email = t1.getText().trim();
                 String password = t2.getText().trim();
+    
                 if (email.isEmpty() || password.isEmpty()) {
-                    showMessage("Please enter credentials", false);
+                    showErrorDialog("Please enter both fields");
                     return;
                 }
-
-                boolean valid = SQLDB.loginValid(email, password);
-                if (valid)
-                    showMessage("Login successful", true);
-                else
-                    showMessage("Invalid Email or Password", false);
-
+    
+                if (SQLDB.loginValid(email, password)) {
+                    showSuccessDialog(); // Start game only after closing dialog
+                } else {
+                    showErrorDialog("Invalid Email or Password");
+                }
             } else if (ae.getSource() == signupBtn) {
                 SQLDB.close();
                 this.dispose();
                 new SignUp();
             }
         }
-
-        // 🔄 Modified to handle success case
-        private void showMessage(String msg, boolean closeFrameOnOk) {
-            Dialog d = new Dialog(this, "Message", true);
+    
+        // Success dialog without OK button
+        private void showSuccessDialog() {
+            Dialog d = new Dialog(this, "Success", true);
             d.setLayout(new FlowLayout());
+            d.setSize(350, 100);
+            d.setLocationRelativeTo(this);
+            d.add(new Label("Login successful! Close this window to continue."));
+    
+            d.addWindowListener(new WindowAdapter() {
+                public void windowClosing(WindowEvent e) {
+                    d.dispose();         // Close dialog
+                    dispose();          // Close login frame
+                    String query = "SELECT username FROM users WHERE email = " + t1.getText().trim();
+                    
+                    new MemoryCardGame(t1.getText().trim()); // Start the game
+                }
+            });
+    
+            d.setVisible(true);
+        }
+    
+        // Dialog for error messages (with OK button)
+        private void showErrorDialog(String msg) {
+            Dialog d = new Dialog(this, "Error", true);
+            d.setLayout(new FlowLayout());
+            d.setSize(250, 100);
+            d.setLocationRelativeTo(this);
+    
             d.add(new Label(msg));
-
             d.addWindowListener(new WindowAdapter() {
                 public void windowClosing(WindowEvent e) {
                     d.dispose();
-                    if (closeFrameOnOk) {
-                        dispose(); // Close login window
-                    }
                 }
             });
-
-            d.setSize(250, 100);
-            d.setLocationRelativeTo(this);
             d.setVisible(true);
         }
     }
-
+      
     public class MainApp {
         public static void main(String[] args) {
-            new SignUp();
+            SwingUtilities.invokeLater(() -> new SignUp());
         }
     }
