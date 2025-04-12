@@ -35,7 +35,7 @@ class MemoryCardGame extends JFrame {
 
 
     private void selectTheme() {
-        String[] themes = {"Cricket", "IPL", "Anime", "Memes"};
+        String[] themes = {"Cricket", "IPL", "Anime"};
         selectedTheme = (String) JOptionPane.showInputDialog(
             this, "Select a Theme:", "Theme Selection", 
             JOptionPane.QUESTION_MESSAGE, null, themes, themes[0]
