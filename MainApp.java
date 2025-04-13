@@ -7,6 +7,74 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+class LeaderboardFrame extends JFrame {
+    public LeaderboardFrame(String currentUserEmail) {
+        setTitle("Leaderboard");
+        setSize(500, 500);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+
+        String[] columnNames = {"Rank", "Username", "Score"};
+        DefaultTableModel model = new DefaultTableModel(columnNames, 0);
+        JTable table = new JTable(model);
+        JScrollPane scrollPane = new JScrollPane(table);
+
+        try {
+            Connection conn = DriverManager.getConnection("jdbc:sqlite:D:\\Java\\Java-Project\\javaapp.db");
+
+            // Get top 10 users
+            String top10Query = "SELECT username, score FROM users ORDER BY score DESC LIMIT 5";
+            PreparedStatement ps = conn.prepareStatement(top10Query);
+            ResultSet rs = ps.executeQuery();
+
+            int rank = 1;
+            List<String> top10Emails = new ArrayList<>();
+            while (rs.next()) {
+                String username = rs.getString("username");
+                double score = rs.getDouble("score");
+
+                model.addRow(new Object[]{rank, username, score});
+                rank++;
+            }
+
+            // Check if current user is in top 10
+            String rankQuery = "SELECT username, score, " +
+                    "(SELECT COUNT(*) + 1 FROM users WHERE score > u.score) AS rank " +
+                    "FROM users u WHERE email = ?";
+            ps = conn.prepareStatement(rankQuery);
+            ps.setString(1, currentUserEmail);
+            rs = ps.executeQuery();
+
+            if (rs.next()) {
+                int userRank = rs.getInt("rank");
+                String username = rs.getString("username");
+                double userScore = rs.getDouble("score");
+
+                if (userRank > 5) {
+                    // Add a separator and current user's rank
+                    model.addRow(new Object[]{"---", "---", "---"});
+                    model.addRow(new Object[]{userRank, username, userScore});
+                }
+            }
+
+            conn.close();
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error loading leaderboard: " + e.getMessage());
+        }
+
+        add(scrollPane, BorderLayout.CENTER);
+        setVisible(true);
+    }
+}
+
+
 class MemoryCardGame extends JFrame {
     private JPanel mainPanel;
     private String selectedTheme;
@@ -156,6 +224,8 @@ class MemoryCardGame extends JFrame {
         System.out.println(numMoves);
         JOptionPane.showMessageDialog(this, "Game Over!\n" + "Your Score: " + String.format("%.4f", score), "Game Completed", JOptionPane.INFORMATION_MESSAGE);
         SQLDB.updateScore(userEmail, score); 
+        this.dispose(); // Close current game frame
+        new LeaderboardFrame(userEmail);
     }
 
     private ImageIcon loadImage(String path, int width, int height) {
@@ -227,27 +297,45 @@ class MemoryCardGame extends JFrame {
         public static boolean updateScore(String email, double score) {
             if (conn == null) return false;
             try {
-                conn.close();
+                conn.close(); // This is unnecessary here; better to check if already open and reuse
                 Class.forName("org.sqlite.JDBC");
                 conn = DriverManager.getConnection("jdbc:sqlite:" + "D:\\Java\\Java-Project\\javaapp.db");
                 stmt = conn.createStatement();
-                String query = "UPDATE users SET score = ? WHERE email = ?";
-                PreparedStatement ps = conn.prepareStatement(query);
-                ps.setDouble(1, score);
-                ps.setString(2, email);
         
-                int rowsUpdated = ps.executeUpdate();
-                return rowsUpdated > 0;
+                // Step 1: Get current score
+                String selectQuery = "SELECT score FROM users WHERE email = ?";
+                PreparedStatement selectStmt = conn.prepareStatement(selectQuery);
+                selectStmt.setString(1, email);
+                ResultSet rs = selectStmt.executeQuery();
+        
+                if (rs.next()) {
+                    double currentScore = rs.getDouble("score");
+        
+                    // Step 2: Compare and update if new score is higher
+                    if (score > currentScore) {
+                        String updateQuery = "UPDATE users SET score = ? WHERE email = ?";
+                        PreparedStatement updateStmt = conn.prepareStatement(updateQuery);
+                        updateStmt.setDouble(1, score);
+                        updateStmt.setString(2, email);
+        
+                        int rowsUpdated = updateStmt.executeUpdate();
+                        return rowsUpdated > 0;
+                    } else {
+                        return false;
+                    }
+                } else {
+                    System.out.println("User not found with email: " + email);
+                    return false;
+                }
             } catch (SQLException e) {
                 System.out.println("Failed to update score: " + e.getMessage());
                 return false;
-            }
-            catch(Exception e){
-                System.out.println("Exception " + e.getMessage());
+            } catch (Exception e) {
+                System.out.println("Exception: " + e.getMessage());
                 return false;
-
             }
         }
+        
         
         public static void close() {
             try {
