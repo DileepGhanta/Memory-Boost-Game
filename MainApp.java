@@ -108,7 +108,6 @@ class LeaderboardFrame extends JFrame {
 
                 int rank = 1;
                 while (rsTop.next()) {
-                    String email = rsTop.getString("email");
                     String username = rsTop.getString("username");
                     double score = rsTop.getDouble("score");
                     model.addRow(new Object[]{rank, username, String.format("%.4f", score)});
