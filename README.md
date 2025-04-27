@@ -31,8 +31,8 @@ This Java-based Memory Boost Game project is a comprehensive desktop application
 git clone https://github.com/DileepGhanta/Memory-Boost-Game.git
 ```
 
-- Refer the following link for SQLite Installation
-https://docs.google.com/document/d/1QI-S8keazW8rkgmco5U-mdDQhbLZPsCRrIu7C9udyr4/edit?usp=sharing
+- Refer to [this guide for SQLite Installation](https://docs.google.com/document/d/1QI-S8keazW8rkgmco5U-mdDQhbLZPsCRrIu7C9udyr4/edit?usp=sharing)
+
 
 - Step 1
 
