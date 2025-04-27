@@ -25,23 +25,30 @@ This Java-based Memory Boost Game project is a comprehensive desktop application
 
 ## Setup Steps
 
-- Clone the Repository
+### 1. Clone the Repository
 
-```
+```bash
 git clone https://github.com/DileepGhanta/Memory-Boost-Game.git
 ```
 
-- Refer to [this guide for SQLite Installation](https://docs.google.com/document/d/1QI-S8keazW8rkgmco5U-mdDQhbLZPsCRrIu7C9udyr4/edit?usp=sharing)
+### 2. Install SQLite
 
+Refer to [this guide for SQLite Installation](https://docs.google.com/document/d/1QI-S8keazW8rkgmco5U-mdDQhbLZPsCRrIu7C9udyr4/edit?usp=sharing).
 
-- Step 1
+### 3. Update Database Path
 
-```
+Before running the project, update your database path in the `MainApp.java` file:
+- **Step 1**: Inside the `SQLDB` class
+- **Step 2**: Inside the `loadLeaderboardData` method
+
+### 4. Compile the Project
+
+```bash
 javac MainApp.java
 ```
-- Step 2
 
-```
+### 5. Run the Project
+
+```bash
 java -cp "D:\Java\Java-Project\sqlite-jdbc-3.49.1.0.jar;." MainApp
 ```
-
