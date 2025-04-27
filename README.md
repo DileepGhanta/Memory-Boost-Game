@@ -1,5 +1,5 @@
 
-<h1 align="center">Memory Boost Game</h1>
+<h1 align="center">Memory Boost Game 🎮</h1>
 
 ## Overview
 This Java-based Memory Boost Game project is a comprehensive desktop application that combines a classic memory-matching card game with user authentication and leaderboard functionalities. Built using Java Swing for the GUI and SQLite for data persistence, the application features user registration/login systems, a theme-based memory game (with cricket, IPL, and anime options), dynamic score calculation based on efficiency, and a leaderboard displaying top players alongside the current user's rank. The game mechanics include card flipping animations, move tracking, and score calculation formulas that reward fewer moves, while the database integration handles user credentials storage, score updates, and leaderboard queries. The interface utilizes custom styling with consistent color schemes and fonts, featuring responsive buttons, grid-based card layouts, and proper error handling throughout the authentication and gameplay processes.
