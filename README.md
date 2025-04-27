@@ -49,6 +49,8 @@ javac MainApp.java
 
 ### 5. Run the Project
 
+> ⚡ **Important:** Make sure to update the path to `sqlite-jdbc-3.49.1.0.jar` according to its location on your system.
+
 ```bash
 java -cp "D:\Java\Java-Project\sqlite-jdbc-3.49.1.0.jar;." MainApp
 ```
